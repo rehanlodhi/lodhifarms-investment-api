@@ -16,11 +16,23 @@ from .security import password_hash
 async def lifespan(_: FastAPI):
     if settings.jwt_secret in {"change-me", ""}:
         raise RuntimeError("Set a real JWT_SECRET in .env")
-    await db.users.create_index("email", unique=True)
-    if not await db.users.find_one({"email": settings.admin_email}):
-        await db.users.insert_one(
-            {"email": settings.admin_email, "password": password_hash.hash(settings.admin_password)}
-        )
+    try:
+        await db.users.drop_index("email_1")  # replaced by the partial indexes below
+    except Exception:
+        pass
+    only_str = lambda f: {"partialFilterExpression": {f: {"$type": "string"}}}  # noqa: E731
+    await db.users.create_index("email", unique=True, name="email_unique", **only_str("email"))
+    await db.users.create_index("username", unique=True, name="username_unique", **only_str("username"))
+
+    admin = await db.users.find_one({"$or": [{"username": settings.admin_username}, {"email": settings.admin_email}]})
+    if not admin:
+        await db.users.insert_one({
+            "username": settings.admin_username,
+            "email": settings.admin_email,
+            "password": password_hash.hash(settings.admin_password),
+        })
+    elif not admin.get("username"):
+        await db.users.update_one({"_id": admin["_id"]}, {"$set": {"username": settings.admin_username}})
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     yield
 

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     mongo_db: str = "lodhifarms_investment"
     jwt_secret: str  # required; set in .env
     jwt_expire_minutes: int = 60 * 24
+    admin_username: str = "admin"
     admin_email: str = "admin@lodhifarms.com"
     admin_password: str  # required; set in .env
     cors_origins: list[str] = ["http://localhost:4200"]
