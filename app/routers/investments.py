@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..config import settings
 from ..db import db
+from ..models import BulkDeleteIn, BulkInvestmentIn
 from ..security import CurrentUser
 from .crud import oid
 from ..models import serialize
@@ -49,6 +50,41 @@ async def list_investments():
         d["type_name"] = types.get(d["type_id"], "?")
         out.append(d)
     return out
+
+
+@router.post("/bulk", status_code=201)
+async def bulk_create(body: BulkInvestmentIn):
+    investor_ids = list(dict.fromkeys(body.investor_ids))
+    if not await db.investment_types.find_one({"_id": oid(body.type_id)}):
+        raise HTTPException(422, "Unknown investment type")
+    found = await db.investors.count_documents({"_id": {"$in": [oid(i) for i in investor_ids]}})
+    if found != len(investor_ids):
+        raise HTTPException(422, "Unknown investor in list")
+
+    month = body.month or body.date.isoformat()[:7]
+    created = skipped = 0
+    for investor_id in investor_ids:
+        key = {"investor_id": investor_id, "type_id": body.type_id, "month": month, "amount": body.amount}
+        if body.skip_existing and await db.investments.find_one(key):
+            skipped += 1
+            continue
+        await db.investments.insert_one({
+            **key, "date": body.date.isoformat(), "note": body.note, "screenshots": [],
+            "created_at": datetime.now(timezone.utc),
+        })
+        created += 1
+    return {"created": created, "skipped": skipped}
+
+
+@router.post("/bulk-delete")
+async def bulk_delete(body: BulkDeleteIn):
+    ids = [oid(i) for i in dict.fromkeys(body.ids)]
+    docs = await db.investments.find({"_id": {"$in": ids}}).to_list(None)
+    await db.investments.delete_many({"_id": {"$in": ids}})
+    for doc in docs:
+        for name in doc.get("screenshots", []):
+            (settings.upload_dir / Path(name).name).unlink(missing_ok=True)
+    return {"deleted": len(docs)}
 
 
 @router.post("", status_code=201)

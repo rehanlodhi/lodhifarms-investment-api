@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .db import db
 from .models import InvestmentTypeIn, InvestorIn
-from .routers import auth, investments, stats
+from .routers import auth, investments, requests, stats
 from .routers.crud import crud_router
 from .security import password_hash
 
@@ -50,6 +50,7 @@ api.include_router(auth.router)
 api.include_router(crud_router("/investors", "investors", InvestorIn, "investor_id"))
 api.include_router(crud_router("/investment-types", "investment_types", InvestmentTypeIn, "type_id"))
 api.include_router(investments.router)
+api.include_router(requests.router)
 api.include_router(stats.router)
 app.include_router(api)
 
