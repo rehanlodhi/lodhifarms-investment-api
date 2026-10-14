@@ -22,13 +22,13 @@ async def stats():
         tm = by_type_month.setdefault(d["type_id"], {})
         tm[month] = tm.get(month, 0) + d["amount"]
 
-    auto_goals = await owed_by_type()
+    requested = await owed_by_type()  # sum of requests due so far, per type
     types = [
         {
             "id": str(t["_id"]),
             "name": t["name"],
-            "goal": auto_goals.get(str(t["_id"]), 0) if t.get("auto_goal") else t["goal"],
-            "auto_goal": bool(t.get("auto_goal")),
+            # A goal of 0/null means "no fixed goal": use the sum of the type's requests.
+            "goal": t.get("goal") or requested.get(str(t["_id"]), 0),
             "raised": by_type.get(str(t["_id"]), 0),
         }
         async for t in db.investment_types.find().sort("name", 1)

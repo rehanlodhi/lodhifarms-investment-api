@@ -20,10 +20,8 @@ class InvestorIn(BaseModel):
 
 class InvestmentTypeIn(BaseModel):
     name: str = Field(min_length=1)
-    goal: float = Field(ge=0)
-    # When true the goal is not a fixed number: it is the total owed through the
-    # current month according to this type's requests, so it grows every month.
-    auto_goal: bool = False
+    # Fixed goal. Leave empty or 0 to use the sum of this type's requests instead.
+    goal: float | None = Field(default=None, ge=0)
     description: str | None = None
 
 
